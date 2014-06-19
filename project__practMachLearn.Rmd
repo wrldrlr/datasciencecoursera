@@ -1,0 +1,121 @@
+Project for practical machine learning course
+========================================================
+The goal of your project is to predict the manner in which they did the exercise. 
+This is the "classe" variable in the training set.
+You may use any of the other
+variables to predict with. You should create a report describing how you built your model,
+how you used cross validation, what you think the expected out of
+sample error is, and why you made the choices you did. You will also use your prediction model
+to predict 20 different test cases.
+Note : building model takes a long time due to kfold cross validation used and tuning the model parameters
+ 
+
+```{r load test train csv files }
+#   load training and test data data sets, these should be in default folder 
+#   have a look at structure
+#   classe is oucome variable, convert it factor variable
+#   have a look at various variables and compare data structure of test and  training data sets
+
+    train <- read.csv('pml-training.csv',stringsAsFactors =F); str(train); train <-train[-1]
+    test <- read.csv('pml-testing.csv',stringsAsFactors =F); str(test); test <-test[-1]
+    train$classe <- as.factor(train$classe)
+
+```
+
+
+```{r compare training and test data }
+
+#  verify  training and test data structures match
+#  only the last column does not match
+
+    which( colnames(train)=="classe" )
+    rnametr <-  names(train)
+    rnamete <-names(test)
+    rnametr ==   rnamete
+```
+
+
+```{r clean up data }
+#  remove data columns  which are blank  or have all missing NA values
+#  also get rid of person name and time of sampling data
+    
+    x1 <-train
+    train <-x1[!sapply(x1, function(x)  { all(x == "" || is.na(x)) }   ) ]
+    x2 <-test
+    test <-x2[!sapply(x1, function(x)  { all(x == "" || is.na(x)) }   ) ]
+    train <-train[,-(1:4)]; 
+    test <- test[,-(1:4)]; 
+```
+
+
+```{r sample train data & split it for checking accuracy }
+
+
+
+# sample only 2000 records from  training data set as original as has 19622 records
+# also split data to trainValid and trainSample data sets    
+    
+    sampleRows = sample(1:dim(train)[1],size=2000,replace=F)
+    trainSample = train[sampleRows,];row.names(trainSample)  <-NULL
+    trainValid  = train[-sampleRows,];row.names(trainValid) <- NULL
+```
+
+ 
+ 
+```{r build models}
+
+#  build models    
+#  use k fold cross validation  (and the argument repeats controls the number of repetitions). K
+# is controlled by the number argument and defaults to 10. Also parameters of random forest are tuned
+# use random forest & caret package to build model and overall  accuracy was used as a measure of error
+# note : it takes a long time to build the model & saved and loaded just in case
+    library(caret) 
+    ctrl <- trainControl(method = "repeatedcv",   repeats = 1,number =10)  
+    modlRF <-train( as.factor(classe)  ~ .,trControl = ctrl,tuneLength = 5,  data = trainSample ,
+                    preProc = c("center", "scale"),
+                    method="rf")
+                    
+
+```
+
+
+```{r validate the accurcy of model on unknown data set}
+
+
+#   save model as it takes a long time to re-build it 
+#   use the model to predict trainValid data set and compute accuracy
+#   output shown below, accuaracy is about 97% which is acceptable
+
+    save(modlRF, file = "modlRF.rda") 
+    load(file = "modlRF.rda")
+    modlRF 
+    predValid  <-predict(modlRF, trainValid[-55])
+    confusionMatrix(predValid, trainValid[,55],dnn = c("Prediction", "Reference"))
+
+ 
+ 
+```
+
+
+```{r predict for test data set}
+
+#   use prediction model
+#   to predict 20 different test cases. and save output as indivdual files
+#   for checking on corsera platform for accuracy
+
+    predTest <-predict(modlRF, test[-55])
+     
+    answers = rep("A", 20)
+    pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+            filename = paste0("problem_id_",i,".txt")
+            write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+    }
+    pml_write_files(predTest)
+    predTest
+    
+ 
+```
+
